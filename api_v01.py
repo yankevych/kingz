@@ -30,9 +30,28 @@ async def admin(request):
     return web.Response(text=txt)
 
 
+async def new(request):
+    """create new car page"""
+    context = dict()
+    response = aiohttp_jinja2.render_template('new.html',
+                                              request,
+                                              context
+                                            )
+    return response
+
+
 async def main(request):
     """main handler with list of all cars"""
-    context = dict()
+    print(0)
+    print(request.method)
+    if request.method == 'POST':
+        print(11)
+        form = await request.post()
+        print(form)
+        context = form
+    elif request.method == 'GET':
+        print(22)
+        context = dict()
     response = aiohttp_jinja2.render_template('main.html',
                                               request, context
                                             )
@@ -66,11 +85,13 @@ db = loop.run_until_complete(setup_db())
 
 app = web.Application()
 app['db'] = db
-app.add_routes([web.get('/admin', admin),
-                web.post('/login', login),
+app.add_routes([web.get('/admin', admin, name='admin'),
+                web.post('/login', login, name='login'),
                 web.get('/', login),
                 web.get('/main', main),
-                # web.post('/main', main),
+                web.post('/main', main),
+                web.post('/new', new),
+                web.get('/new', new),
                 ])
 aiohttp_jinja2.setup(app,
                      loader=jinja2.FileSystemLoader(os.path.join(os.getcwd(), 'template')))
