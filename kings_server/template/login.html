@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BmbxuPwQa2lc/FVzBcNJ7UAyJxM6wuqIj61tLrc4wSX0szH/Ev+nYRRuWlolflfl" crossorigin="anonymous">
+</head>
+<body>
+<div class="container-sm">
+    <div class="border border-primary p-4">
+        <form action="/login" method="post" accept-charset="utf-8"
+              enctype="application/x-www-form-urlencoded">
+            <div class="form-group w-25">
+                <label for="login">Login</label>
+                <input id="login" class="form-control" name="login" type="text" value="" required autofocus/>
+            </div>
+            <div class="form-group w-25">
+                <label for="password">Password</label>
+                <input id="password" class="form-control" name="password" type="password" required value=""/>
+            </div>
+            <br>
+                <input type="submit" value="Login"/>
+            <br>
+        </form>
+        <form action="/register" method="get" accept-charset="utf-8"
+              enctype="application/x-www-form-urlencoded">
+            <br>
+              <input type="submit" value="Create new user"/>
+            <br>
+        </form>
+    </div>
+</div>
+</body>
+</html>
