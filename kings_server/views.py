@@ -1,33 +1,20 @@
 import asyncio
-import base64
-import os
-import pprint
 
+import os
 import aiohttp_jinja2
-import bcrypt
+
 import jinja2
+from datetime import datetime
 from aiohttp import web
 from motor.motor_asyncio import AsyncIOMotorClient
 from db import car
 from bson import ObjectId
+from loguru import logger
+from security import *
+import trafaret as t
 
-WEBAPP_HOST = 'localhost'  # or ip
+WEBAPP_HOST = 'localhost'
 WEBAPP_PORT = 8000
-
-
-def generate_password_hash(password, salt_rounds=10):
-    password_bin = password.encode('utf-8')
-    hashed = bcrypt.hashpw(password_bin, bcrypt.gensalt(salt_rounds))
-    encoded = base64.b64encode(hashed)
-    return encoded.decode('utf-8')
-
-
-def check_password_hash(encoded, password):
-    password = password.encode('utf-8')
-    encoded = encoded.encode('utf-8')
-    hashed = base64.b64decode(encoded)
-    is_correct = bcrypt.hashpw(password, hashed) == hashed
-    return is_correct
 
 
 async def setup_db():
@@ -72,33 +59,36 @@ async def new(request):
 @aiohttp_jinja2.template('main.html')
 async def main(request):
     """main handler with list of all cars"""
-    print(request.method)
     if request.method == 'POST':
         post = await request.post()
-        document = car.check(post)   # validate form
-        print(document)
-        result = await db.cars.insert_one(document)
+        try:
+            document = car.check(post)   # validate form
+            logger.info(document)
+            document.update({"timestamp": datetime.now()})
+            await db.cars.insert_one(document)
+        except t.DataError as e:
+            return web.json_response(data={'error': e.as_dict()})
 
     elif request.method == 'GET':
         pass
 
     context = {'cars': await db_fetch_all()}
-    print(context)
+    logger.info(context)
     return context
 
 
 @aiohttp_jinja2.template('login.html')
 async def login(request):
-    print(request.method)
+    """main login page with login checker"""
     if request.method == 'GET':
         return {}
     elif request.method == 'POST':
         data = await request.post()
         username = data['login']
         password = data['password']
-        print(username, password)
+        logger.info(username, password)
         status = await check_login(username, password)
-        print(status)
+        logger.info(status)
         if status['status'] == 'User not match':
             return web.json_response(data={'error': status['status']})
         elif status['status'] == 'Nice':
@@ -124,31 +114,38 @@ async def register(request):
 @aiohttp_jinja2.template('main.html')
 async def delete_car(request):
     """handler that delete car from main list and from db"""
-    print(request)
     if request.method == 'POST':
         data = await request.post()
-        result = await db.cars.delete_one({'_id': ObjectId(data["car_id"])})
+        await db.cars.delete_one({'_id': ObjectId(data["car_id"])})
         return web.HTTPFound('/main')
 
 
 @aiohttp_jinja2.template('edit.html')
 async def edit_car(request):
     """handler that render edit car page with db values"""
-    print(request)
     if request.method == 'POST':
         data = await request.post()
         context = {'car': await db.cars.find_one({'_id': ObjectId(data['car_id'])})}
-        print(context)
+        logger.info(context)
         return context
 
 
 async def save_edit(request):
     """save edited car data to db"""
-    print(request)
     if request.method == 'POST':
         data = await request.post()
-        result = await db.cars.update_one({'_id': ObjectId(data['car_id'])}, {'$set': data})
+        await db.cars.update_one({'_id': ObjectId(data['car_id'])}, {'$set': data})
         return web.HTTPFound('/main')
+
+
+@aiohttp_jinja2.template('main.html')
+async def search(request):
+    """filter car from search method"""
+    if request.method == 'POST':
+        data = await request.post()
+        cursor = db.cars.find({f'{data["method"]}': f'{data["query"]}'}).sort('timestamp')
+        context = {'cars': [x for x in await cursor.to_list(length=100)]}
+        return context
 
 
 loop = asyncio.get_event_loop()
@@ -167,6 +164,7 @@ app.add_routes([web.post('/login', login, name='login'),
                 web.post('/edit_car', edit_car),
                 web.post('/delete_car', delete_car),
                 web.post('/save_edit', save_edit),
+                web.post('/search', search),
                 ])
 aiohttp_jinja2.setup(app,
                      loader=jinja2.FileSystemLoader(os.path.join(os.getcwd(), 'template')))
