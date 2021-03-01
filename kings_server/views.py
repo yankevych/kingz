@@ -61,13 +61,17 @@ async def main(request):
     """main handler with list of all cars"""
     if request.method == 'POST':
         post = await request.post()
-        try:
-            document = car.check(post)   # validate form
-            logger.info(document)
-            document.update({"timestamp": datetime.now()})
-            await db.cars.insert_one(document)
-        except t.DataError as e:
-            return web.json_response(data={'error': e.as_dict()})
+        pre_check = await db.cars.find_one({'vin': post['vin']})    # check if VIN is unique
+        if pre_check:
+            return web.json_response(data={'error': 'VIN must be unique'})
+        else:
+            try:
+                document = car.check(post)   # validate form
+                logger.info(document)
+                document.update({"timestamp": datetime.now()})
+                await db.cars.insert_one(document)
+            except t.DataError as e:
+                return web.json_response(data={'error': e.as_dict()})
 
     elif request.method == 'GET':
         pass
