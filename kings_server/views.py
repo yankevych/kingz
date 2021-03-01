@@ -1,16 +1,19 @@
 import asyncio
-
 import os
 import aiohttp_jinja2
-
 import jinja2
+
 from datetime import datetime
 from aiohttp import web
+from aiohttp_security import remember, SessionIdentityPolicy
+from aiohttp_security import setup as setup_security
+from aiohttp_session import SimpleCookieStorage, session_middleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from db import car
 from bson import ObjectId
 from loguru import logger
-from security import *
+from security import generate_password_hash, check_password_hash, AuthorizationPolicy, auth_required
+
 import trafaret as t
 
 WEBAPP_HOST = 'localhost'
@@ -106,9 +109,11 @@ async def register(request):
     """make new user and redirect to main"""
     if request.method == 'POST':
         data = await request.post()
-        result = await new_user(data['login'], data['password'])
-        if result:
-            return web.HTTPFound('/main')
+        user = await new_user(data['login'], data['password'])
+        if user:
+            response = web.HTTPFound('/')
+            await remember(request, response, str(user.inserted_id))
+            return response
         else:
             return web.json_response(data={'error': 'something wrong / try again later'})
     elif request.method == 'GET':
@@ -134,6 +139,7 @@ async def edit_car(request):
         return context
 
 
+@auth_required
 async def save_edit(request):
     """save edited car data to db"""
     if request.method == 'POST':
@@ -155,7 +161,9 @@ async def search(request):
 loop = asyncio.get_event_loop()
 db = loop.run_until_complete(setup_db())
 
-app = web.Application()
+middleware = session_middleware(SimpleCookieStorage())
+app = web.Application(middlewares=[middleware])
+
 app['db'] = db
 app.add_routes([web.post('/login', login, name='login'),
                 web.get('/', login),
@@ -172,4 +180,6 @@ app.add_routes([web.post('/login', login, name='login'),
                 ])
 aiohttp_jinja2.setup(app,
                      loader=jinja2.FileSystemLoader(os.path.join(os.getcwd(), 'template')))
+
+setup_security(app, SessionIdentityPolicy(), AuthorizationPolicy(db))
 web.run_app(app, host=WEBAPP_HOST, port=WEBAPP_PORT)
