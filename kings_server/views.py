@@ -9,6 +9,8 @@ from aiohttp_security import remember, SessionIdentityPolicy
 from aiohttp_security import setup as setup_security
 from aiohttp_session import SimpleCookieStorage, session_middleware
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import IndexModel, ASCENDING, DESCENDING
+
 from db import car
 from bson import ObjectId
 from loguru import logger
@@ -24,6 +26,16 @@ async def setup_db():
     """base db setup f-n"""
     client = AsyncIOMotorClient()
     db = client['kings_db']
+    user_index1 = IndexModel([("username", ASCENDING)], unique=True)
+    user_index2 = IndexModel([("password", ASCENDING)])
+    await db.user.create_indexes([user_index1, user_index2])
+    car_index1 = IndexModel([("manufacturer", ASCENDING)])
+    car_index2 = IndexModel([("model", ASCENDING)])
+    car_index3 = IndexModel([("year", ASCENDING)])
+    car_index4 = IndexModel([("color", ASCENDING)])
+    car_index5 = IndexModel([("vin", ASCENDING)], unique=True)
+    car_index6 = IndexModel([("timestamp", ASCENDING)])
+    await db.cars.create_indexes([car_index1, car_index2, car_index3, car_index4, car_index5, car_index6])
     return db
 
 
@@ -80,7 +92,7 @@ async def main(request):
         pass
 
     context = {'cars': await db_fetch_all()}
-    logger.info(context)
+    # logger.info(context)
     return context
 
 
